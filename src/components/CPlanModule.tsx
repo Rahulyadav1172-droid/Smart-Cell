@@ -239,6 +239,10 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
     link.click();
   };
 
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+
   const filteredRecords = records.filter((r) => {
     const q = searchQuery.toLowerCase();
     return (
@@ -249,6 +253,15 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
       r.thanaName.toLowerCase().includes(q)
     );
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedRecords = filteredRecords.slice(startIndex, startIndex + pageSize);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedThanaFilter]);
+
 
   return (
     <div className="space-y-4">
@@ -371,23 +384,23 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map((r, i) => (
+                paginatedRecords.map((r, i) => (
                   <tr key={r.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 px-3 text-slate-500 font-mono">{i + 1}</td>
-                    <td className="py-3 px-3 text-slate-400">{r.district || 'अयोध्या'}</td>
-                    <td className="py-3 px-3 text-slate-400">{r.circle}</td>
-                    <td className="py-3 px-3 font-medium text-white">{r.thanaName}</td>
-                    <td className="py-3 px-3 text-slate-300">{r.halkaChowki || '—'}</td>
-                    <td className="py-3 px-3 font-semibold text-slate-200">{r.gramMohalla}</td>
-                    <td className="py-3 px-3 text-slate-400">{r.majraName || '—'}</td>
-                    <td className="py-3 px-3 font-mono text-slate-400">{r.distanceKm || '0'}</td>
-                    <td className="py-3 px-3 font-semibold text-amber-300">{r.personName}</td>
-                    <td className="py-3 px-3">
+                    <td className="py-2.5 px-3 text-slate-500 font-mono">{startIndex + i + 1}</td>
+                    <td className="py-2.5 px-3 text-slate-400">{r.district || 'अयोध्या'}</td>
+                    <td className="py-2.5 px-3 text-slate-400">{r.circle}</td>
+                    <td className="py-2.5 px-3 font-medium text-white">{r.thanaName}</td>
+                    <td className="py-2.5 px-3 text-slate-300">{r.halkaChowki || '—'}</td>
+                    <td className="py-2.5 px-3 font-semibold text-slate-200">{r.gramMohalla}</td>
+                    <td className="py-2.5 px-3 text-slate-400">{r.majraName || '—'}</td>
+                    <td className="py-2.5 px-3 font-mono text-slate-400">{r.distanceKm || '0'}</td>
+                    <td className="py-2.5 px-3 font-semibold text-amber-300">{r.personName}</td>
+                    <td className="py-2.5 px-3">
                       <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[11px]">
                         {r.designationProfession}
                       </span>
                     </td>
-                    <td className="py-3 px-3 font-mono font-bold text-blue-300">
+                    <td className="py-2.5 px-3 font-mono font-bold text-blue-300">
                       {r.mobileNumber}
                     </td>
                   </tr>
@@ -396,7 +409,72 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
             </tbody>
           </table>
         </div>
+
+        {/* Clean Pagination Bar */}
+        {filteredRecords.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-slate-950/70 border-t border-slate-800 text-xs text-slate-400">
+            <div className="flex items-center gap-2">
+              <span>
+                कुल <strong>{filteredRecords.length.toLocaleString('en-IN')}</strong> रिकॉर्ड्स | दिखा रहे हैं{' '}
+                <strong>{startIndex + 1}</strong> -{' '}
+                <strong>{Math.min(startIndex + pageSize, filteredRecords.length).toLocaleString('en-IN')}</strong>
+              </span>
+
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs text-slate-300 focus:outline-none ml-2"
+              >
+                <option value={25}>25 प्रति पेज</option>
+                <option value={50}>50 प्रति पेज</option>
+                <option value={100}>100 प्रति पेज</option>
+                <option value={250}>250 प्रति पेज</option>
+                <option value={500}>500 प्रति पेज</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5 font-medium">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:text-white disabled:opacity-40 disabled:hover:text-slate-400"
+              >
+                « पहला
+              </button>
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:text-white disabled:opacity-40 disabled:hover:text-slate-400"
+              >
+                ‹ पिछला
+              </button>
+
+              <span className="px-3 py-1 font-mono text-slate-300">
+                पेज {currentPage} / {totalPages}
+              </span>
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:text-white disabled:opacity-40 disabled:hover:text-slate-400"
+              >
+                अगला ›
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 hover:text-white disabled:opacity-40 disabled:hover:text-slate-400"
+              >
+                अंतिम »
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
 
       {/* NEW RECORD POPUP MODAL */}
       {showAddModal && (
