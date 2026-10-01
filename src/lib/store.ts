@@ -1,5 +1,5 @@
 import { AYODHYA_THANAS, SMART_CELL_ADMIN } from '@/data/thanas';
-import { CPlanRecord, EOfficeCredential, BroadcastNotice } from './types';
+import { PoliceMitraRecord, EOfficeCredential, BroadcastNotice } from './types';
 import { supabase } from './supabase';
 
 class DataStore {
@@ -20,135 +20,77 @@ class DataStore {
     updatedAt: new Date().toISOString(),
   }));
 
-  private cPlanRecords: CPlanRecord[] = [
+  // Initial records in the exact format of the user's Google Sheet
+  private records: PoliceMitraRecord[] = [
     {
-      id: 'cplan-1',
+      id: 'rec-1',
+      sNo: 1,
+      district: 'अयोध्या',
+      circle: 'सर्किल नगर',
       thanaId: 'kotwali-nagar',
-      thanaName: 'Kotwali Nagar',
+      thanaName: 'कोतवाली नगर',
+      halkaChowki: 'चौकी सिविल लाइन्स',
+      gramMohalla: 'सिविल लाइन्स',
+      majraName: 'मजरा कंचनपुर',
+      distanceKm: '2.5',
       personName: 'राम प्रकाश वर्मा',
-      relativeName: 'श्री दीनदयाल वर्मा',
+      designationProfession: 'व्यापारी / संभ्रान्त नागरिक',
       mobileNumber: '9839123456',
-      villageOrWard: 'वार्ड संख्या 12, सिविल लाइन्स',
-      categoryProfession: 'व्यापारी / संभ्रांत नागरिक',
-      beatConstableName: 'का. राहुल सिंह',
-      beatConstableMobile: '9454499001',
-      status: 'VERIFIED',
-      remarks: 'शांति समिति सदस्य, सक्रिय नागरिक',
-      createdAt: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
-      updatedAt: new Date(Date.now() - 3600000 * 24 * 3).toISOString(),
-    },
-    {
-      id: 'cplan-2',
-      thanaId: 'kotwali-ayodhya',
-      thanaName: 'Kotwali Ayodhya',
-      personName: 'महंत सत्येंद्र दास',
-      relativeName: 'गुरु कृपा',
-      mobileNumber: '9838765432',
-      villageOrWard: 'रामकोट मोहल्ला',
-      categoryProfession: 'धर्मगुरु / संभ्रांत नागरिक',
-      beatConstableName: 'हे.का. अमित कुमार',
-      beatConstableMobile: '9454499002',
-      status: 'VERIFIED',
-      remarks: 'मंदिर परिसर समिति',
-      createdAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
-      updatedAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
-    },
-    {
-      id: 'cplan-3',
-      thanaId: 'kotwali-bikapur',
-      thanaName: 'Kotwali Bikapur',
-      personName: 'सुरेश बहादुर सिंह',
-      relativeName: 'श्री जयपाल सिंह',
-      mobileNumber: '9415678901',
-      villageOrWard: 'ग्राम पंचायत जलालपुर',
-      categoryProfession: 'ग्राम प्रधान',
-      beatConstableName: 'का. पंकज यादव',
-      beatConstableMobile: '9454499003',
-      status: 'SUBMITTED',
-      remarks: 'पंचायत प्रतिनिधि',
-      createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-      updatedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    },
-    {
-      id: 'cplan-4',
-      thanaId: 'cyber-thana',
-      thanaName: 'Cyber Thana',
-      personName: 'अनिल कुमार श्रीवास्तव',
-      relativeName: 'श्री आर.के. श्रीवास्तव',
-      mobileNumber: '9919876540',
-      villageOrWard: 'टेढ़ी बाजार',
-      categoryProfession: 'आईटी विशेषज्ञ / साइबर वॉलंटियर',
-      beatConstableName: 'उप निरीक्षक साइबर सेल',
-      beatConstableMobile: '7839876653',
-      status: 'VERIFIED',
-      remarks: 'साइबर जागरूकता वॉलिंटियर',
-      createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-      updatedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-    },
-  ];
-
-  private notices: BroadcastNotice[] = [
-    {
-      id: 'notice-1',
-      title: 'C-Plan संभ्रांत नागरिक डाटा अपडेशन अभियान 2026',
-      content:
-        'सभी थाना प्रभारी / CUG धारक अपने क्षेत्र के प्रत्येक बीट/गांव से कम से कम 25 संभ्रांत नागरिकों (ग्राम प्रधान, पूर्व सैनिक, शिक्षक, व्यापारी) का विवरण तत्काल C-Plan पोर्टल पर दर्ज करें। मोबाइल नंबर की शुद्धता अनिवार्य है।',
-      priority: 'URGENT',
-      issuedBy: 'पुलिस अधीक्षक / स्मार्ट सेल अयोध्या',
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     },
     {
-      id: 'notice-2',
-      title: 'e-Office नया VPN पासवर्ड दिशा-निर्देश',
-      content:
-        'NIC द्वारा e-Office VPN पासवर्ड पॉलिसी अपडेट की गई है। सभी थाने अपने क्रेडेंशियल वॉल्ट से नया VPN पासवर्ड प्राप्त करें एवं सुरक्षित रखें। किसी भी परिस्थिति में WhatsApp ग्रुप में शेयर न करें।',
-      priority: 'HIGH',
-      issuedBy: 'स्मार्ट सेल / कंप्यूटर शाखा',
-      createdAt: new Date(Date.now() - 3600000 * 20).toISOString(),
+      id: 'rec-2',
+      sNo: 2,
+      district: 'अयोध्या',
+      circle: 'सर्किल अयोध्या',
+      thanaId: 'kotwali-ayodhya',
+      thanaName: 'कोतवाली अयोध्या',
+      halkaChowki: 'चौकी नया घाट',
+      gramMohalla: 'रामकोट',
+      majraName: 'दशरथ महल क्षेत्र',
+      distanceKm: '0.8',
+      personName: 'महंत सत्येंद्र दास',
+      designationProfession: 'धर्मगुरु / संभ्रान्त नागरिक',
+      mobileNumber: '9838765432',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'rec-3',
+      sNo: 3,
+      district: 'अयोध्या',
+      circle: 'सर्किल बीकापुर',
+      thanaId: 'kotwali-bikapur',
+      thanaName: 'कोतवाली बीकापुर',
+      halkaChowki: 'हल्का सं. 03 जलालपुर',
+      gramMohalla: 'जलालपुर',
+      majraName: 'सिंहपुर मजरा',
+      distanceKm: '3.0',
+      personName: 'सुरेश बहादुर सिंह',
+      designationProfession: 'ग्राम प्रधान / पुलिस मित्र',
+      mobileNumber: '9415678901',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: 'rec-4',
+      sNo: 4,
+      district: 'अयोध्या',
+      circle: 'साइबर कमान',
+      thanaId: 'cyber-thana',
+      thanaName: 'साइबर थाना',
+      halkaChowki: 'मुख्यालय बीट',
+      gramMohalla: 'टेढ़ी बाजार',
+      majraName: 'मुख्य बस्ती',
+      distanceKm: '0.0',
+      personName: 'अनिल कुमार श्रीवास्तव',
+      designationProfession: 'आईटी विशेषज्ञ / साइबर मित्र',
+      mobileNumber: '9919876540',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     },
   ];
-
-  constructor() {
-    this.initSupabaseSync();
-  }
-
-  private async initSupabaseSync() {
-    try {
-      // Check if Supabase has existing C-Plan records
-      const { data, error } = await supabase.from('c_plan_records').select('*').limit(100);
-      if (!error && data && data.length > 0) {
-        const syncedRecords: CPlanRecord[] = data.map((row: any) => {
-          const thana = this.getThanaById(row.thana_id);
-          return {
-            id: row.id,
-            thanaId: row.thana_id,
-            thanaName: thana?.name || row.thana_id,
-            personName: row.person_name,
-            relativeName: row.relative_name,
-            mobileNumber: row.mobile_number,
-            villageOrWard: row.village_or_ward,
-            categoryProfession: row.category_profession,
-            beatConstableName: row.beat_constable_name,
-            beatConstableMobile: row.beat_constable_mobile,
-            status: row.status || 'SUBMITTED',
-            remarks: row.remarks,
-            createdAt: row.created_at,
-            updatedAt: row.updated_at,
-          };
-        });
-
-        // Merge without duplicates
-        const existingMobiles = new Set(this.cPlanRecords.map((r) => r.mobileNumber));
-        for (const s of syncedRecords) {
-          if (!existingMobiles.has(s.mobileNumber)) {
-            this.cPlanRecords.push(s);
-          }
-        }
-      }
-    } catch (e) {
-      // Fallback seamlessly to local cache
-    }
-  }
 
   public getThanas() {
     return this.thanas;
@@ -166,7 +108,7 @@ class DataStore {
     const cleaned = mobileNumber.replace(/\D/g, '').slice(-10);
     if (cleaned.length !== 10) return null;
 
-    const existing = this.cPlanRecords.find(
+    const existing = this.records.find(
       (r) => r.mobileNumber.replace(/\D/g, '').slice(-10) === cleaned && r.id !== excludeId
     );
 
@@ -180,7 +122,7 @@ class DataStore {
     return { isDuplicate: false };
   }
 
-  public addCPlanRecord(data: Omit<CPlanRecord, 'id' | 'createdAt' | 'updatedAt'>) {
+  public addRecord(data: Omit<PoliceMitraRecord, 'id' | 'sNo' | 'createdAt' | 'updatedAt'>) {
     const cleanedMobile = data.mobileNumber.replace(/\D/g, '').slice(-10);
     const dupCheck = this.checkMobileDuplicate(cleanedMobile);
     if (dupCheck?.isDuplicate) {
@@ -189,66 +131,81 @@ class DataStore {
       );
     }
 
-    const newRecord: CPlanRecord = {
+    const newRecord: PoliceMitraRecord = {
       ...data,
-      id: `cplan-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: `rec-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      sNo: this.records.length + 1,
       mobileNumber: cleanedMobile,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    this.cPlanRecords.unshift(newRecord);
+    this.records.unshift(newRecord);
 
     // Sync to Supabase in background
     try {
       supabase
-        .from('c_plan_records')
+        .from('police_mitra_records')
         .insert({
+          district: data.district || 'अयोध्या',
+          circle: data.circle,
           thana_id: data.thanaId,
+          thana_name: data.thanaName,
+          halka_chowki: data.halkaChowki,
+          gram_mohalla: data.gramMohalla,
+          majra_name: data.majraName,
+          distance_km: data.distanceKm,
           person_name: data.personName,
-          relative_name: data.relativeName,
+          designation_profession: data.designationProfession,
           mobile_number: cleanedMobile,
-          village_or_ward: data.villageOrWard,
-          category_profession: data.categoryProfession,
-          beat_constable_name: data.beatConstableName,
-          beat_constable_mobile: data.beatConstableMobile,
-          status: 'SUBMITTED',
-          remarks: data.remarks,
         })
-        .then(({ error }) => {
-          if (error) console.log('Supabase sync notice:', error.message);
-        });
-    } catch (e) {
-      // Non-blocking
-    }
+        .then();
+    } catch (e) {}
 
     return newRecord;
   }
 
-  public getCPlanRecords(thanaId?: string) {
-    if (!thanaId || thanaId === 'all') {
-      return this.cPlanRecords;
+  public bulkImport(recordsList: Omit<PoliceMitraRecord, 'id' | 'sNo' | 'createdAt' | 'updatedAt'>[]) {
+    let importedCount = 0;
+    let skippedDuplicates = 0;
+
+    for (const item of recordsList) {
+      const cleaned = item.mobileNumber.replace(/\D/g, '').slice(-10);
+      if (cleaned.length === 10) {
+        const dup = this.checkMobileDuplicate(cleaned);
+        if (!dup?.isDuplicate) {
+          this.records.push({
+            ...item,
+            id: `rec-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+            sNo: this.records.length + 1,
+            mobileNumber: cleaned,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+          importedCount++;
+        } else {
+          skippedDuplicates++;
+        }
+      }
     }
-    return this.cPlanRecords.filter((r) => r.thanaId === thanaId);
+
+    return { importedCount, skippedDuplicates, totalInStore: this.records.length };
   }
 
-  public updateCPlanStatus(id: string, status: 'SUBMITTED' | 'VERIFIED' | 'LOCKED') {
-    const record = this.cPlanRecords.find((r) => r.id === id);
-    if (record) {
-      record.status = status;
-      record.updatedAt = new Date().toISOString();
-
-      try {
-        supabase
-          .from('c_plan_records')
-          .update({ status, updated_at: new Date().toISOString() })
-          .eq('mobile_number', record.mobileNumber)
-          .then();
-      } catch (e) {}
-
-      return record;
+  public getRecords(thanaId?: string) {
+    if (!thanaId || thanaId === 'all') {
+      return this.records;
     }
-    return null;
+    return this.records.filter((r) => r.thanaId === thanaId);
+  }
+
+  // Alias for backward compatibility
+  public getCPlanRecords(thanaId?: string) {
+    return this.getRecords(thanaId);
+  }
+
+  public addCPlanRecord(data: any) {
+    return this.addRecord(data);
   }
 
   public getEOfficeCredentials(thanaId?: string) {
@@ -266,26 +223,21 @@ class DataStore {
         updatedAt: new Date().toISOString(),
         lastUpdatedBy: 'Smart Cell Admin',
       });
-
-      try {
-        supabase
-          .from('eoffice_credentials')
-          .update({
-            vpn_username: updates.vpnUsername,
-            vpn_password: updates.vpnPassword,
-            eoffice_id: updates.eofficeId,
-            nic_email: updates.nicEmail,
-            assigned_system_ip: updates.assignedSystemIp,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('thana_id', thanaId)
-          .then();
-      } catch (e) {}
-
       return cred;
     }
     return null;
   }
+
+  private notices: BroadcastNotice[] = [
+    {
+      id: 'notice-1',
+      title: 'संभ्रान्त व्यक्ति / पुलिस मित्र डेटाबेस अद्यतन अभियान',
+      content: 'सभी थाना प्रभारी अपने-अपने क्षेत्र के प्रत्येक मुख्य ग्राम एवं मजरे से संभ्रान्त नागरिकों का विवरण समय से पूर्ण कराएं।',
+      priority: 'HIGH',
+      issuedBy: 'स्मार्ट सेल / पुलिस अधीक्षक अयोध्या',
+      createdAt: new Date().toISOString(),
+    },
+  ];
 
   public getNotices() {
     return this.notices;
@@ -298,32 +250,18 @@ class DataStore {
       createdAt: new Date().toISOString(),
     };
     this.notices.unshift(newNotice);
-
-    try {
-      supabase
-        .from('broadcast_notices')
-        .insert({
-          title: notice.title,
-          content: notice.content,
-          priority: notice.priority,
-          issued_by: notice.issuedBy,
-        })
-        .then();
-    } catch (e) {}
-
     return newNotice;
   }
 
   public getDistrictStats() {
-    const totalRecords = this.cPlanRecords.length;
-    const verifiedRecords = this.cPlanRecords.filter((r) => r.status === 'VERIFIED').length;
+    const totalRecords = this.records.length;
     const thanaWiseCounts: Record<string, number> = {};
 
     this.thanas.forEach((t) => {
       thanaWiseCounts[t.id] = 0;
     });
 
-    this.cPlanRecords.forEach((r) => {
+    this.records.forEach((r) => {
       if (thanaWiseCounts[r.thanaId] !== undefined) {
         thanaWiseCounts[r.thanaId]++;
       }
@@ -332,16 +270,7 @@ class DataStore {
     return {
       totalThanas: this.thanas.length,
       totalRecords,
-      verifiedRecords,
-      pendingRecords: totalRecords - verifiedRecords,
       thanaWiseCounts,
-      topPerformingThanas: Object.entries(thanaWiseCounts)
-        .map(([thanaId, count]) => {
-          const thana = this.getThanaById(thanaId);
-          return { thanaId, name: thana?.name || thanaId, count };
-        })
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5),
     };
   }
 }

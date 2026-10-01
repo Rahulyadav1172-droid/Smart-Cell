@@ -1,6 +1,6 @@
 -- ==========================================================
--- SMART CELL AYODHYA - DISTRICT POLICE COMMAND PORTAL
--- SUPABASE / POSTGRESQL PRODUCTION DATABASE SCHEMA
+-- SMART CELL AYODHYA - POLICE MITRA & C-PLAN DATABASE
+-- EXACT 11 HEADINGS MATCHING DISTRICT POLICE FORMAT
 -- ==========================================================
 
 -- 1. THANAS & POLICE STATIONS TABLE
@@ -17,29 +17,40 @@ CREATE TABLE IF NOT EXISTS public.thanas (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
--- 2. C-PLAN RECORDS (SAMBHRANT NAGRIK / COMMUNITY POLICING)
-CREATE TABLE IF NOT EXISTS public.c_plan_records (
+-- 2. POLICE MITRA / SAMBHRANT NAGRIK (EXACT 11 COLUMNS)
+-- 1. क्र0सं0 (s_no)
+-- 2. जनपद (district)
+-- 3. सर्किल (circle)
+-- 4. थाना (thana_name)
+-- 5. हल्का/चौकी (halka_chowki)
+-- 6. ग्राम/मौहल्ला (gram_mohalla)
+-- 7. मजरे का नाम (majra_name)
+-- 8. मुख्य ग्राम/मुहल्ले से मजरे की दूरी (distance_km)
+-- 9. संभ्रान्त व्यक्ति/पुलिस मित्र का नाम (person_name)
+-- 10. पदनाम/व्यवसाय (designation_profession)
+-- 11. मो0नं0 (mobile_number)
+CREATE TABLE IF NOT EXISTS public.police_mitra_records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    thana_id TEXT REFERENCES public.thanas(id) ON DELETE RESTRICT,
+    s_no SERIAL,
+    district TEXT DEFAULT 'अयोध्या',
+    circle TEXT NOT NULL,
+    thana_id TEXT REFERENCES public.thanas(id),
+    thana_name TEXT NOT NULL,
+    halka_chowki TEXT DEFAULT '—',
+    gram_mohalla TEXT NOT NULL,
+    majra_name TEXT DEFAULT 'मुख्य बस्ती',
+    distance_km TEXT DEFAULT '0',
     person_name TEXT NOT NULL,
-    relative_name TEXT NOT NULL, -- Pita / Pati ka Naam
+    designation_profession TEXT NOT NULL,
     mobile_number VARCHAR(15) NOT NULL,
-    village_or_ward TEXT NOT NULL,
-    category_profession TEXT NOT NULL, -- Pradhan, Vyapari, Retired Fauji, etc.
-    beat_constable_name TEXT,
-    beat_constable_mobile VARCHAR(15),
-    id_proof_number TEXT,
-    status TEXT DEFAULT 'SUBMITTED' CHECK (status IN ('SUBMITTED', 'VERIFIED', 'LOCKED')),
-    remarks TEXT,
-    created_by_cug VARCHAR(15),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
--- CRITICAL: DISTRICT-WIDE UNIQUE MOBILE NUMBER CONSTRAINT
-CREATE UNIQUE INDEX IF NOT EXISTS idx_c_plan_mobile_unique ON public.c_plan_records (mobile_number);
-CREATE INDEX IF NOT EXISTS idx_c_plan_thana ON public.c_plan_records (thana_id);
-CREATE INDEX IF NOT EXISTS idx_c_plan_village ON public.c_plan_records (village_or_ward);
+-- CRITICAL: DISTRICT-WIDE UNIQUE MOBILE NUMBER CHECK
+CREATE UNIQUE INDEX IF NOT EXISTS idx_police_mitra_mobile ON public.police_mitra_records (mobile_number);
+CREATE INDEX IF NOT EXISTS idx_police_mitra_thana ON public.police_mitra_records (thana_id);
+CREATE INDEX IF NOT EXISTS idx_police_mitra_gram ON public.police_mitra_records (gram_mohalla);
 
 -- 3. E-OFFICE & VPN CREDENTIALS VAULT
 CREATE TABLE IF NOT EXISTS public.eoffice_credentials (
@@ -56,32 +67,7 @@ CREATE TABLE IF NOT EXISTS public.eoffice_credentials (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
 
--- 4. SMART CELL BROADCAST NOTICES / DIRECTIVES
-CREATE TABLE IF NOT EXISTS public.broadcast_notices (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    priority TEXT DEFAULT 'NORMAL' CHECK (priority IN ('NORMAL', 'HIGH', 'URGENT')),
-    issued_by TEXT DEFAULT 'Smart Cell Ayodhya',
-    target_thanas TEXT[] DEFAULT ARRAY['ALL'], -- 'ALL' or array of thana IDs
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);
-
--- 5. AUDIT LOGS FOR TAMPER DETECTION
-CREATE TABLE IF NOT EXISTS public.system_audit_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    actor_id TEXT NOT NULL,
-    actor_name TEXT NOT NULL,
-    action_type TEXT NOT NULL, -- LOGIN, VIEW_CREDENTIAL, ADD_C_PLAN, EXPORT_DATA
-    details TEXT,
-    ip_address TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);
-
--- ==========================================================
--- SEED DATA: INSERT ALL 21 AYODHYA POLICE STATIONS
--- ==========================================================
+-- 4. SEED DATA: INSERT ALL 21 AYODHYA POLICE STATIONS
 INSERT INTO public.thanas (id, name, hindi_name, cug_number, email, circle, category, pin_hash) VALUES
 ('kotwali-nagar', 'Kotwali Nagar', 'कोतवाली नगर', '9454403303', 'sho-kotnagar.ay@up.gov.in', 'Circle Nagar', 'Kotwali', '123456'),
 ('kotwali-cantt', 'Kotwali Cantt', 'कोतवाली कैंट', '9454403298', 'sho-cantt.ay@up.gov.in', 'Circle Cantt', 'Kotwali', '123456'),
@@ -106,7 +92,7 @@ INSERT INTO public.thanas (id, name, hindi_name, cug_number, email, circle, cate
 ('cyber-thana', 'Cyber Thana', 'साइबर क्राइम पुलिस थाना', '7839876653', 'sho-cybercrime.ay@up.gov.in', 'District Cyber Command', 'Special Unit', '123456')
 ON CONFLICT (id) DO NOTHING;
 
--- SEED INITIAL E-OFFICE VAULT ROWS FOR EACH THANA
+-- 5. SEED INITIAL E-OFFICE VAULT ROWS
 INSERT INTO public.eoffice_credentials (thana_id, vpn_username, vpn_password, eoffice_id, nic_email)
 SELECT 
     t.id,

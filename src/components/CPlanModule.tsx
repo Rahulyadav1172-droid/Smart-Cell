@@ -1,18 +1,18 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus,
   Search,
   Download,
+  Upload,
   Phone,
   ShieldCheck,
   ShieldAlert,
   X,
-  Building2,
-  RefreshCw,
+  FileSpreadsheet,
 } from 'lucide-react';
-import { CPlanRecord, UserSession } from '@/lib/types';
+import { PoliceMitraRecord, UserSession } from '@/lib/types';
 import { AYODHYA_THANAS } from '@/data/thanas';
 
 interface CPlanModuleProps {
@@ -22,21 +22,28 @@ interface CPlanModuleProps {
 export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
   const isSuperAdmin = user.role === 'SUPER_ADMIN';
 
-  const [records, setRecords] = useState<CPlanRecord[]>([]);
+  const [records, setRecords] = useState<PoliceMitraRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedThanaFilter, setSelectedThanaFilter] = useState<string>(isSuperAdmin ? 'all' : user.thanaId || '');
   const [showAddModal, setShowAddModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Form State
+  // Form State matching the exact 11 columns
+  const activeThanaObj = AYODHYA_THANAS.find((t) => t.id === user.thanaId) || AYODHYA_THANAS[0];
+
   const [formData, setFormData] = useState({
+    district: 'अयोध्या',
+    circle: activeThanaObj.circle,
+    thanaId: activeThanaObj.id,
+    thanaName: activeThanaObj.hindiName,
+    halkaChowki: '',
+    gramMohalla: '',
+    majraName: '',
+    distanceKm: '0',
     personName: '',
-    relativeName: '',
+    designationProfession: 'संभ्रान्त नागरिक / पुलिस मित्र',
     mobileNumber: '',
-    villageOrWard: '',
-    categoryProfession: 'संभ्रांत नागरिक',
-    beatConstableName: '',
-    remarks: '',
   });
 
   // Duplicate Check
@@ -49,6 +56,7 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
 
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [importSummary, setImportSummary] = useState<string | null>(null);
 
   const fetchRecords = async () => {
     try {
@@ -106,26 +114,26 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
       const res = await fetch('/api/cplan/records', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          thanaId: user.thanaId || 'smart-cell-hq',
-          thanaName: user.thanaName,
-        }),
+        body: JSON.stringify(formData),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save');
 
-      // Success -> Close modal & reset
+      // Success
       setShowAddModal(false);
       setFormData({
+        district: 'अयोध्या',
+        circle: activeThanaObj.circle,
+        thanaId: activeThanaObj.id,
+        thanaName: activeThanaObj.hindiName,
+        halkaChowki: '',
+        gramMohalla: '',
+        majraName: '',
+        distanceKm: '0',
         personName: '',
-        relativeName: '',
+        designationProfession: 'संभ्रान्त नागरिक / पुलिस मित्र',
         mobileNumber: '',
-        villageOrWard: '',
-        categoryProfession: 'संभ्रांत नागरिक',
-        beatConstableName: '',
-        remarks: '',
       });
       setDuplicateInfo(null);
       fetchRecords();
@@ -136,25 +144,98 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
     }
   };
 
+  // CSV Bulk Import Handler
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        if (lines.length < 2) return;
+
+        // Parse CSV lines
+        const newRecords = [];
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map((c) => c.replace(/^"|"$/g, '').trim());
+          if (cols.length >= 7) {
+            // Mapping exact columns
+            newRecords.push({
+              district: cols[1] || 'अयोध्या',
+              circle: cols[2] || activeThanaObj.circle,
+              thanaName: cols[3] || activeThanaObj.hindiName,
+              thanaId: user.thanaId || 'kotwali-nagar',
+              halkaChowki: cols[4] || '—',
+              gramMohalla: cols[5] || '',
+              majraName: cols[6] || 'मुख्य बस्ती',
+              distanceKm: cols[7] || '0',
+              personName: cols[8] || '',
+              designationProfession: cols[9] || 'संभ्रान्त नागरिक',
+              mobileNumber: cols[10] || '',
+            });
+          }
+        }
+
+        const res = await fetch('/api/cplan/records', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bulk: true, records: newRecords }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          setImportSummary(
+            `सफलतापूर्वक ${data.result.importedCount} रिकॉर्ड्स इम्पोर्ट हुए! (${data.result.skippedDuplicates} डुप्लीकेट छोड़े गए)`
+          );
+          fetchRecords();
+          setTimeout(() => setImportSummary(null), 7000);
+        }
+      } catch (err) {
+        alert('CSV फाइल पढ़ने में त्रुटि!');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Export exact 11 columns to CSV
   const handleExportCSV = () => {
     if (records.length === 0) return;
-    const headers = ['थाना', 'नाम', 'पिता/पति', 'मोबाइल', 'गाँव/वार्ड', 'श्रेणी', 'बीट आरक्षी', 'स्टेटस'];
-    const rows = records.map((r) => [
+    const headers = [
+      'क्र0सं0',
+      'जनपद',
+      'सर्किल',
+      'थाना',
+      'हल्का/चौकी',
+      'ग्राम/मौहल्ला',
+      'मजरे का नाम',
+      'मुख्य ग्राम/मुहल्ले से मजरे की दूरी (किमी में)',
+      'संभ्रान्त व्यक्ति/पुलिस मित्र का नाम',
+      'पदनाम/व्यवसाय',
+      'मो0नं0',
+    ];
+
+    const rows = records.map((r, i) => [
+      i + 1,
+      `"${r.district || 'अयोध्या'}"`,
+      `"${r.circle}"`,
       `"${r.thanaName}"`,
+      `"${r.halkaChowki}"`,
+      `"${r.gramMohalla}"`,
+      `"${r.majraName}"`,
+      `"${r.distanceKm}"`,
       `"${r.personName}"`,
-      `"${r.relativeName}"`,
+      `"${r.designationProfession}"`,
       r.mobileNumber,
-      `"${r.villageOrWard}"`,
-      `"${r.categoryProfession}"`,
-      `"${r.beatConstableName || ''}"`,
-      r.status,
     ]);
+
     const csvContent =
       'data:text/csv;charset=utf-8,\uFEFF' +
       [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const link = document.createElement('a');
     link.href = encodeURI(csvContent);
-    link.download = `C-Plan_Ayodhya_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `Police_Mitra_Ayodhya_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
   };
 
@@ -163,7 +244,8 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
     return (
       r.personName.toLowerCase().includes(q) ||
       r.mobileNumber.includes(q) ||
-      r.villageOrWard.toLowerCase().includes(q) ||
+      r.gramMohalla.toLowerCase().includes(q) ||
+      r.majraName.toLowerCase().includes(q) ||
       r.thanaName.toLowerCase().includes(q)
     );
   });
@@ -171,26 +253,28 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
   return (
     <div className="space-y-4">
       
-      {/* Clean Header Bar */}
+      {/* Top Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
         <div>
-          <h2 className="text-lg font-bold text-white">C-Plan संभ्रांत नागरिक</h2>
+          <h2 className="text-lg font-bold text-white">
+            संभ्रान्त व्यक्ति / पुलिस मित्र डेटाबेस (C-Plan)
+          </h2>
           <p className="text-xs text-slate-400">
             {isSuperAdmin
-              ? `जनपद अयोध्या • कुल ${records.length} नागरिक पंजीकृत`
-              : `थाना ${user.thanaName} • ${records.length} नागरिक दर्ज`}
+              ? `जनपद अयोध्या • कुल ${records.length} संभ्रान्त नागरिक / पुलिस मित्र दर्ज`
+              : `थाना ${user.thanaName} • ${records.length} रिकॉर्ड्स दर्ज`}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Search Input */}
+          {/* Search */}
           <div className="relative">
             <input
               type="text"
               placeholder="नाम, मोबाइल, गाँव..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-48 sm:w-64 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 pl-8 focus:outline-none focus:border-blue-500"
+              className="w-44 sm:w-60 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder-slate-500 pl-8 focus:outline-none focus:border-blue-500"
             />
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
           </div>
@@ -211,84 +295,100 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
             </select>
           )}
 
-          {/* Export Button */}
+          {/* Import CSV Button */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".csv"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            title="Google Sheet की CSV फाइल अपलोड करें"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 bg-slate-900 border border-slate-800 hover:text-white hover:border-slate-700"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">CSV इम्पोर्ट</span>
+          </button>
+
+          {/* Export CSV Button */}
           <button
             onClick={handleExportCSV}
-            title="Excel/CSV डाउनलोड"
-            className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-colors"
+            title="Excel/CSV डाउनलोड करें"
+            className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
           >
             <Download className="w-4 h-4" />
           </button>
 
-          {/* Add Record Button */}
+          {/* Add Record */}
           <button
             onClick={() => setShowAddModal(true)}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 shadow-sm transition-all"
           >
             <Plus className="w-4 h-4" />
-            <span>नई प्रविष्टि</span>
+            <span>+ नई प्रविष्टि</span>
           </button>
         </div>
       </div>
 
-      {/* Clean Table */}
+      {importSummary && (
+        <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-700 text-emerald-200 text-xs flex items-center gap-2">
+          <span>{importSummary}</span>
+        </div>
+      )}
+
+      {/* EXACT 11 COLUMNS TABLE */}
       <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950/60 text-slate-400 uppercase font-medium border-b border-slate-800">
+            <thead className="bg-slate-950/70 text-slate-400 font-semibold border-b border-slate-800 whitespace-nowrap">
               <tr>
-                <th className="py-3 px-4 w-12">#</th>
-                {isSuperAdmin && <th className="py-3 px-4">थाना</th>}
-                <th className="py-3 px-4 font-semibold">व्यक्ति का नाम</th>
-                <th className="py-3 px-4">पिता / पति</th>
-                <th className="py-3 px-4">मोबाइल नंबर</th>
-                <th className="py-3 px-4">गाँव / वार्ड</th>
-                <th className="py-3 px-4">श्रेणी</th>
-                <th className="py-3 px-4">बीट आरक्षी</th>
-                <th className="py-3 px-4 text-right">स्थिति</th>
+                <th className="py-3 px-3">क्र0सं0</th>
+                <th className="py-3 px-3">जनपद</th>
+                <th className="py-3 px-3">सर्किल</th>
+                <th className="py-3 px-3">थाना</th>
+                <th className="py-3 px-3">हल्का/चौकी</th>
+                <th className="py-3 px-3">ग्राम/मौहल्ला</th>
+                <th className="py-3 px-3">मजरे का नाम</th>
+                <th className="py-3 px-3">मुख्य ग्राम से दूरी (किमी)</th>
+                <th className="py-3 px-3 font-bold text-amber-300">संभ्रान्त व्यक्ति/पुलिस मित्र का नाम</th>
+                <th className="py-3 px-3">पदनाम/व्यवसाय</th>
+                <th className="py-3 px-3 font-mono text-blue-300">मो0नं0</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-slate-800/50 font-normal">
               {loading ? (
                 <tr>
-                  <td colSpan={isSuperAdmin ? 9 : 8} className="py-12 text-center text-slate-500">
-                    लोड हो रहा है...
+                  <td colSpan={11} className="py-12 text-center text-slate-500">
+                    रिकॉर्ड्स लोड हो रहे हैं...
                   </td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={isSuperAdmin ? 9 : 8} className="py-12 text-center text-slate-500">
-                    कोई रिकॉर्ड उपलब्ध नहीं है। ऊपर दिए गए "नई प्रविष्टि" बटन से जोड़ें।
+                  <td colSpan={11} className="py-12 text-center text-slate-500">
+                    कोई रिकॉर्ड उपलब्ध नहीं है। "+ नई प्रविष्टि" या "CSV इम्पोर्ट" से जोड़ें।
                   </td>
                 </tr>
               ) : (
                 filteredRecords.map((r, i) => (
                   <tr key={r.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 px-4 text-slate-500 font-mono">{i + 1}</td>
-                    {isSuperAdmin && (
-                      <td className="py-3 px-4 font-medium text-amber-400/90">
-                        {r.thanaName}
-                      </td>
-                    )}
-                    <td className="py-3 px-4 font-semibold text-white">
-                      {r.personName}
+                    <td className="py-3 px-3 text-slate-500 font-mono">{i + 1}</td>
+                    <td className="py-3 px-3 text-slate-400">{r.district || 'अयोध्या'}</td>
+                    <td className="py-3 px-3 text-slate-400">{r.circle}</td>
+                    <td className="py-3 px-3 font-medium text-white">{r.thanaName}</td>
+                    <td className="py-3 px-3 text-slate-300">{r.halkaChowki || '—'}</td>
+                    <td className="py-3 px-3 font-semibold text-slate-200">{r.gramMohalla}</td>
+                    <td className="py-3 px-3 text-slate-400">{r.majraName || '—'}</td>
+                    <td className="py-3 px-3 font-mono text-slate-400">{r.distanceKm || '0'}</td>
+                    <td className="py-3 px-3 font-semibold text-amber-300">{r.personName}</td>
+                    <td className="py-3 px-3">
+                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[11px]">
+                        {r.designationProfession}
+                      </span>
                     </td>
-                    <td className="py-3 px-4 text-slate-400">{r.relativeName}</td>
-                    <td className="py-3 px-4 font-mono font-medium text-blue-300">
+                    <td className="py-3 px-3 font-mono font-bold text-blue-300">
                       {r.mobileNumber}
-                    </td>
-                    <td className="py-3 px-4 text-slate-300">{r.villageOrWard}</td>
-                    <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[11px]">
-                        {r.categoryProfession}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-slate-400">{r.beatConstableName || '—'}</td>
-                    <td className="py-3 px-4 text-right">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">
-                        <ShieldCheck className="w-3 h-3" />
-                        सत्यापित
-                      </span>
                     </td>
                   </tr>
                 ))
@@ -298,15 +398,18 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Clean Add Record Modal */}
+      {/* NEW RECORD POPUP MODAL */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl animate-in fade-in zoom-in-95">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl animate-in fade-in zoom-in-95">
             
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
-              <h3 className="font-bold text-white text-base">
-                नया संभ्रांत नागरिक पंजीकरण
-              </h3>
+              <div>
+                <h3 className="font-bold text-white text-base">
+                  नई संभ्रान्त नागरिक / पुलिस मित्र प्रविष्टि
+                </h3>
+                <span className="text-xs text-amber-400 font-medium">थाना: {formData.thanaName}</span>
+              </div>
               <button
                 onClick={() => {
                   setShowAddModal(false);
@@ -320,8 +423,8 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
             </div>
 
             {errorMessage && (
-              <div className="mb-3 p-2.5 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
-                <span>{errorMessage}</span>
+              <div className="mb-3 p-2.5 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-xs">
+                {errorMessage}
               </div>
             )}
 
@@ -329,13 +432,60 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
               
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">
-                    व्यक्ति का नाम *
-                  </label>
+                  <label className="block text-xs text-slate-400 mb-1">हल्का / चौकी</label>
+                  <input
+                    type="text"
+                    placeholder="उदा. चौकी सिविल लाइन्स / हल्का 2"
+                    value={formData.halkaChowki}
+                    onChange={(e) => setFormData({ ...formData, halkaChowki: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">ग्राम / मौहल्ला *</label>
                   <input
                     type="text"
                     required
-                    placeholder="नाम"
+                    placeholder="मुख्य ग्राम या मौहल्ले का नाम"
+                    value={formData.gramMohalla}
+                    onChange={(e) => setFormData({ ...formData, gramMohalla: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">मजरे का नाम</label>
+                  <input
+                    type="text"
+                    placeholder="मजरे का नाम (यदि कोई हो)"
+                    value={formData.majraName}
+                    onChange={(e) => setFormData({ ...formData, majraName: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">मुख्य ग्राम से दूरी (किमी में)</label>
+                  <input
+                    type="text"
+                    placeholder="उदा. 2.5"
+                    value={formData.distanceKm}
+                    onChange={(e) => setFormData({ ...formData, distanceKm: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">संभ्रान्त व्यक्ति / पुलिस मित्र का नाम *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="व्यक्ति का नाम"
                     value={formData.personName}
                     onChange={(e) => setFormData({ ...formData, personName: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
@@ -343,15 +493,13 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">
-                    पिता / पति का नाम *
-                  </label>
+                  <label className="block text-xs text-slate-400 mb-1">पदनाम / व्यवसाय *</label>
                   <input
                     type="text"
                     required
-                    placeholder="पिता / पति"
-                    value={formData.relativeName}
-                    onChange={(e) => setFormData({ ...formData, relativeName: e.target.value })}
+                    placeholder="उदा. ग्राम प्रधान, व्यापारी, पूर्व सैनिक"
+                    value={formData.designationProfession}
+                    onChange={(e) => setFormData({ ...formData, designationProfession: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
@@ -360,9 +508,9 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
               {/* Mobile Number with Live Duplicate Check */}
               <div>
                 <label className="block text-xs text-slate-400 mb-1 flex justify-between">
-                  <span>मोबाइल नंबर (10 अंक) *</span>
+                  <span>मो0नं0 (10 अंक) *</span>
                   {checkingMobile && (
-                    <span className="text-[10px] text-blue-400 animate-pulse">जांच जारी...</span>
+                    <span className="text-[10px] text-blue-400 animate-pulse">डुप्लीकेट जांच जारी...</span>
                   )}
                 </label>
                 <div className="relative">
@@ -389,74 +537,23 @@ export const CPlanModule: React.FC<CPlanModuleProps> = ({ user }) => {
                   <Phone className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
                 </div>
 
-                {/* Instant Alert */}
                 {duplicateInfo?.isDuplicate && (
                   <div className="mt-1.5 p-2 rounded-lg bg-rose-950/70 border border-rose-800 text-rose-300 text-[11px] flex items-center gap-1.5">
                     <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
                     <span>
-                      डुप्लीकेट! यह नंबर पहले से <strong>{duplicateInfo.thanaName}</strong> में{' '}
-                      <strong>{duplicateInfo.existingRecord?.personName}</strong> के नाम दर्ज है।
+                      ⚠️ <strong>डुप्लीकेट नंबर:</strong> यह नंबर पहले से <strong>{duplicateInfo.thanaName}</strong> में{' '}
+                      <strong>{duplicateInfo.existingRecord?.personName}</strong> के नाम दर्ज है!
                     </span>
                   </div>
                 )}
                 {duplicateInfo && !duplicateInfo.isDuplicate && (
                   <span className="mt-1 text-[11px] text-emerald-400 block">
-                    ✓ नंबर मान्य एवं यूनिक है
+                    ✓ मोबाइल नंबर मान्य एवं यूनिक है (पूरे जनपद में उपलब्ध नहीं)
                   </span>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">
-                    गाँव / वार्ड / मोहल्ला *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="गाँव या वार्ड"
-                    value={formData.villageOrWard}
-                    onChange={(e) => setFormData({ ...formData, villageOrWard: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">
-                    श्रेणी / पेशा *
-                  </label>
-                  <select
-                    value={formData.categoryProfession}
-                    onChange={(e) =>
-                      setFormData({ ...formData, categoryProfession: e.target.value })
-                    }
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="संभ्रांत नागरिक">संभ्रांत नागरिक</option>
-                    <option value="ग्राम प्रधान">ग्राम प्रधान</option>
-                    <option value="बीडीसी सदस्य / सभासद">बीडीसी सदस्य / सभासद</option>
-                    <option value="व्यापारी / उद्योगपति">व्यापारी</option>
-                    <option value="पूर्व सैनिक / सुरक्षा बल">पूर्व सैनिक</option>
-                    <option value="शिक्षक / चिकित्सक">शिक्षक / चिकित्सक</option>
-                    <option value="धार्मिक प्रतिनिधि">धार्मिक प्रतिनिधि</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">
-                  बीट आरक्षी / हल्का इंचार्ज
-                </label>
-                <input
-                  type="text"
-                  placeholder="उदा. का. दिनेश कुमार"
-                  value={formData.beatConstableName}
-                  onChange={(e) => setFormData({ ...formData, beatConstableName: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}

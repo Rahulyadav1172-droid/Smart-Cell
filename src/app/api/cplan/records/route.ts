@@ -5,7 +5,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const thanaId = searchParams.get('thanaId') || undefined;
-    const records = store.getCPlanRecords(thanaId);
+    const records = store.getRecords(thanaId);
     return NextResponse.json({ success: true, count: records.length, records });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message }, { status: 500 });
@@ -15,22 +15,30 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+
+    // Check for Bulk CSV Import
+    if (body.bulk && Array.isArray(body.records)) {
+      const result = store.bulkImport(body.records);
+      return NextResponse.json({ success: true, result });
+    }
+
     const {
+      district,
+      circle,
       thanaId,
       thanaName,
+      halkaChowki,
+      gramMohalla,
+      majraName,
+      distanceKm,
       personName,
-      relativeName,
+      designationProfession,
       mobileNumber,
-      villageOrWard,
-      categoryProfession,
-      beatConstableName,
-      beatConstableMobile,
-      remarks,
     } = body;
 
-    if (!thanaId || !personName || !relativeName || !mobileNumber || !villageOrWard || !categoryProfession) {
+    if (!personName || !mobileNumber || !gramMohalla || !thanaName) {
       return NextResponse.json(
-        { error: 'कृपया सभी आवश्यक फ़ील्ड्स (नाम, पिता/पति का नाम, मोबाइल, गाँव/वार्ड, वर्ग) भरें!' },
+        { error: 'कृपया आवश्यक विवरण (ग्राम/मौहल्ला, संभ्रान्त व्यक्ति का नाम, मोबाइल नं) अवश्य भरें!' },
         { status: 400 }
       );
     }
@@ -38,45 +46,27 @@ export async function POST(request: Request) {
     const cleanMobile = mobileNumber.replace(/\D/g, '').slice(-10);
     if (cleanMobile.length !== 10) {
       return NextResponse.json(
-        { error: 'मोबाइल नंबर 10 अंकों का वैध भारतीय नंबर होना अनिवार्य है!' },
+        { error: 'मोबाइल नंबर 10 अंकों का वैध नंबर होना अनिवार्य है!' },
         { status: 400 }
       );
     }
 
-    const newRecord = store.addCPlanRecord({
-      thanaId,
-      thanaName: thanaName || 'Unknown Thana',
-      personName,
-      relativeName,
+    const newRecord = store.addRecord({
+      district: district || 'अयोध्या',
+      circle: circle || 'सर्किल नगर',
+      thanaId: thanaId || 'kotwali-nagar',
+      thanaName: thanaName || 'कोतवाली नगर',
+      halkaChowki: halkaChowki || '—',
+      gramMohalla: gramMohalla,
+      majraName: majraName || 'मुख्य बस्ती',
+      distanceKm: distanceKm || '0',
+      personName: personName,
+      designationProfession: designationProfession || 'संभ्रान्त नागरिक',
       mobileNumber: cleanMobile,
-      villageOrWard,
-      categoryProfession,
-      beatConstableName,
-      beatConstableMobile,
-      remarks,
-      status: 'SUBMITTED',
     });
 
     return NextResponse.json({ success: true, record: newRecord }, { status: 201 });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Failed to save record' }, { status: 400 });
-  }
-}
-
-export async function PATCH(request: Request) {
-  try {
-    const { id, status } = await request.json();
-    if (!id || !status) {
-      return NextResponse.json({ error: 'ID and Status are required' }, { status: 400 });
-    }
-
-    const updated = store.updateCPlanStatus(id, status);
-    if (!updated) {
-      return NextResponse.json({ error: 'Record not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({ success: true, record: updated });
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message }, { status: 500 });
   }
 }

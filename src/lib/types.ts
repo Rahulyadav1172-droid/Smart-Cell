@@ -9,22 +9,26 @@ export interface Thana {
   defaultPin: string;
 }
 
-export interface CPlanRecord {
+export interface PoliceMitraRecord {
   id: string;
+  sNo?: number;
+  district: string; // जनपद (अयोध्या)
+  circle: string; // सर्किल
   thanaId: string;
-  thanaName: string;
-  personName: string;
-  relativeName: string; // Father / Husband name
-  mobileNumber: string;
-  villageOrWard: string;
-  categoryProfession: string; // Pradhan, BDC, Vyapari, Sambhrant Nagrik, Retired Fauji, Shikshak, etc.
-  beatConstableName?: string;
-  beatConstableMobile?: string;
-  status: 'SUBMITTED' | 'VERIFIED' | 'LOCKED';
-  remarks?: string;
+  thanaName: string; // थाना
+  halkaChowki: string; // हल्का/चौकी
+  gramMohalla: string; // ग्राम/मौहल्ला
+  majraName: string; // मजरे का नाम
+  distanceKm: string; // मुख्य ग्राम/मुहल्ले से मजरे की दूरी (किमी में)
+  personName: string; // संभ्रान्त व्यक्ति/पुलिस मित्र का नाम
+  designationProfession: string; // पदनाम/व्यवसाय
+  mobileNumber: string; // मो0नं0
   createdAt: string;
   updatedAt: string;
 }
+
+// Backward compatibility alias
+export type CPlanRecord = PoliceMitraRecord;
 
 export interface EOfficeCredential {
   id: string;
@@ -55,6 +59,7 @@ export interface UserSession {
   role: 'THANA' | 'SUPER_ADMIN';
   thanaId?: string;
   thanaName: string;
+  hindiName?: string;
   cug: string;
   email: string;
   circle?: string;
