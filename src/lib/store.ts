@@ -1,7 +1,7 @@
 import { AYODHYA_THANAS, SMART_CELL_ADMIN } from '@/data/thanas';
 import { CPlanRecord, EOfficeCredential, BroadcastNotice } from './types';
+import { supabase } from './supabase';
 
-// In-memory persistent singleton for the app runtime
 class DataStore {
   private thanas = [...AYODHYA_THANAS];
 
@@ -84,14 +84,15 @@ class DataStore {
       remarks: 'साइबर जागरूकता वॉलिंटियर',
       createdAt: new Date(Date.now() - 3600000 * 5).toISOString(),
       updatedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-    }
+    },
   ];
 
   private notices: BroadcastNotice[] = [
     {
       id: 'notice-1',
       title: 'C-Plan संभ्रांत नागरिक डाटा अपडेशन अभियान 2026',
-      content: 'सभी थाना प्रभारी / CUG धारक अपने क्षेत्र के प्रत्येक बीट/गांव से कम से कम 25 संभ्रांत नागरिकों (ग्राम प्रधान, पूर्व सैनिक, शिक्षक, व्यापारी) का विवरण तत्काल C-Plan पोर्टल पर दर्ज करें। मोबाइल नंबर की शुद्धता अनिवार्य है।',
+      content:
+        'सभी थाना प्रभारी / CUG धारक अपने क्षेत्र के प्रत्येक बीट/गांव से कम से कम 25 संभ्रांत नागरिकों (ग्राम प्रधान, पूर्व सैनिक, शिक्षक, व्यापारी) का विवरण तत्काल C-Plan पोर्टल पर दर्ज करें। मोबाइल नंबर की शुद्धता अनिवार्य है।',
       priority: 'URGENT',
       issuedBy: 'पुलिस अधीक्षक / स्मार्ट सेल अयोध्या',
       createdAt: new Date().toISOString(),
@@ -99,12 +100,55 @@ class DataStore {
     {
       id: 'notice-2',
       title: 'e-Office नया VPN पासवर्ड दिशा-निर्देश',
-      content: 'NIC द्वारा e-Office VPN पासवर्ड पॉलिसी अपडेट की गई है। सभी थाने अपने क्रेडेंशियल वॉल्ट से नया VPN पासवर्ड प्राप्त करें एवं सुरक्षित रखें। किसी भी परिस्थिति में WhatsApp ग्रुप में शेयर न करें।',
+      content:
+        'NIC द्वारा e-Office VPN पासवर्ड पॉलिसी अपडेट की गई है। सभी थाने अपने क्रेडेंशियल वॉल्ट से नया VPN पासवर्ड प्राप्त करें एवं सुरक्षित रखें। किसी भी परिस्थिति में WhatsApp ग्रुप में शेयर न करें।',
       priority: 'HIGH',
       issuedBy: 'स्मार्ट सेल / कंप्यूटर शाखा',
       createdAt: new Date(Date.now() - 3600000 * 20).toISOString(),
     },
   ];
+
+  constructor() {
+    this.initSupabaseSync();
+  }
+
+  private async initSupabaseSync() {
+    try {
+      // Check if Supabase has existing C-Plan records
+      const { data, error } = await supabase.from('c_plan_records').select('*').limit(100);
+      if (!error && data && data.length > 0) {
+        const syncedRecords: CPlanRecord[] = data.map((row: any) => {
+          const thana = this.getThanaById(row.thana_id);
+          return {
+            id: row.id,
+            thanaId: row.thana_id,
+            thanaName: thana?.name || row.thana_id,
+            personName: row.person_name,
+            relativeName: row.relative_name,
+            mobileNumber: row.mobile_number,
+            villageOrWard: row.village_or_ward,
+            categoryProfession: row.category_profession,
+            beatConstableName: row.beat_constable_name,
+            beatConstableMobile: row.beat_constable_mobile,
+            status: row.status || 'SUBMITTED',
+            remarks: row.remarks,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+          };
+        });
+
+        // Merge without duplicates
+        const existingMobiles = new Set(this.cPlanRecords.map((r) => r.mobileNumber));
+        for (const s of syncedRecords) {
+          if (!existingMobiles.has(s.mobileNumber)) {
+            this.cPlanRecords.push(s);
+          }
+        }
+      }
+    } catch (e) {
+      // Fallback seamlessly to local cache
+    }
+  }
 
   public getThanas() {
     return this.thanas;
@@ -154,6 +198,30 @@ class DataStore {
     };
 
     this.cPlanRecords.unshift(newRecord);
+
+    // Sync to Supabase in background
+    try {
+      supabase
+        .from('c_plan_records')
+        .insert({
+          thana_id: data.thanaId,
+          person_name: data.personName,
+          relative_name: data.relativeName,
+          mobile_number: cleanedMobile,
+          village_or_ward: data.villageOrWard,
+          category_profession: data.categoryProfession,
+          beat_constable_name: data.beatConstableName,
+          beat_constable_mobile: data.beatConstableMobile,
+          status: 'SUBMITTED',
+          remarks: data.remarks,
+        })
+        .then(({ error }) => {
+          if (error) console.log('Supabase sync notice:', error.message);
+        });
+    } catch (e) {
+      // Non-blocking
+    }
+
     return newRecord;
   }
 
@@ -169,6 +237,15 @@ class DataStore {
     if (record) {
       record.status = status;
       record.updatedAt = new Date().toISOString();
+
+      try {
+        supabase
+          .from('c_plan_records')
+          .update({ status, updated_at: new Date().toISOString() })
+          .eq('mobile_number', record.mobileNumber)
+          .then();
+      } catch (e) {}
+
       return record;
     }
     return null;
@@ -189,6 +266,22 @@ class DataStore {
         updatedAt: new Date().toISOString(),
         lastUpdatedBy: 'Smart Cell Admin',
       });
+
+      try {
+        supabase
+          .from('eoffice_credentials')
+          .update({
+            vpn_username: updates.vpnUsername,
+            vpn_password: updates.vpnPassword,
+            eoffice_id: updates.eofficeId,
+            nic_email: updates.nicEmail,
+            assigned_system_ip: updates.assignedSystemIp,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('thana_id', thanaId)
+          .then();
+      } catch (e) {}
+
       return cred;
     }
     return null;
@@ -205,6 +298,19 @@ class DataStore {
       createdAt: new Date().toISOString(),
     };
     this.notices.unshift(newNotice);
+
+    try {
+      supabase
+        .from('broadcast_notices')
+        .insert({
+          title: notice.title,
+          content: notice.content,
+          priority: notice.priority,
+          issued_by: notice.issuedBy,
+        })
+        .then();
+    } catch (e) {}
+
     return newNotice;
   }
 
@@ -240,7 +346,6 @@ class DataStore {
   }
 }
 
-// Global singleton across Next.js API reloads
 declare global {
   var __smartCellStore: DataStore | undefined;
 }
