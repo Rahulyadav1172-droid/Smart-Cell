@@ -20,77 +20,9 @@ class DataStore {
     updatedAt: new Date().toISOString(),
   }));
 
-  // Initial records in the exact format of the user's Google Sheet
-  private records: PoliceMitraRecord[] = [
-    {
-      id: 'rec-1',
-      sNo: 1,
-      district: 'अयोध्या',
-      circle: 'सर्किल नगर',
-      thanaId: 'kotwali-nagar',
-      thanaName: 'कोतवाली नगर',
-      halkaChowki: 'चौकी सिविल लाइन्स',
-      gramMohalla: 'सिविल लाइन्स',
-      majraName: 'मजरा कंचनपुर',
-      distanceKm: '2.5',
-      personName: 'राम प्रकाश वर्मा',
-      designationProfession: 'व्यापारी / संभ्रान्त नागरिक',
-      mobileNumber: '9839123456',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'rec-2',
-      sNo: 2,
-      district: 'अयोध्या',
-      circle: 'सर्किल अयोध्या',
-      thanaId: 'kotwali-ayodhya',
-      thanaName: 'कोतवाली अयोध्या',
-      halkaChowki: 'चौकी नया घाट',
-      gramMohalla: 'रामकोट',
-      majraName: 'दशरथ महल क्षेत्र',
-      distanceKm: '0.8',
-      personName: 'महंत सत्येंद्र दास',
-      designationProfession: 'धर्मगुरु / संभ्रान्त नागरिक',
-      mobileNumber: '9838765432',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'rec-3',
-      sNo: 3,
-      district: 'अयोध्या',
-      circle: 'सर्किल बीकापुर',
-      thanaId: 'kotwali-bikapur',
-      thanaName: 'कोतवाली बीकापुर',
-      halkaChowki: 'हल्का सं. 03 जलालपुर',
-      gramMohalla: 'जलालपुर',
-      majraName: 'सिंहपुर मजरा',
-      distanceKm: '3.0',
-      personName: 'सुरेश बहादुर सिंह',
-      designationProfession: 'ग्राम प्रधान / पुलिस मित्र',
-      mobileNumber: '9415678901',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'rec-4',
-      sNo: 4,
-      district: 'अयोध्या',
-      circle: 'साइबर कमान',
-      thanaId: 'cyber-thana',
-      thanaName: 'साइबर थाना',
-      halkaChowki: 'मुख्यालय बीट',
-      gramMohalla: 'टेढ़ी बाजार',
-      majraName: 'मुख्य बस्ती',
-      distanceKm: '0.0',
-      personName: 'अनिल कुमार श्रीवास्तव',
-      designationProfession: 'आईटी विशेषज्ञ / साइबर मित्र',
-      mobileNumber: '9919876540',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
+  // Clean initial records - zero demo records
+  private records: PoliceMitraRecord[] = [];
+
 
   public getThanas() {
     return this.thanas;
